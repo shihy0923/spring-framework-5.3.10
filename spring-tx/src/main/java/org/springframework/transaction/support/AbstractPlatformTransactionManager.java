@@ -16,14 +16,8 @@
 
 package org.springframework.transaction.support;
 
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.Serializable;
-import java.util.List;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
 import org.springframework.core.Constants;
 import org.springframework.lang.Nullable;
 import org.springframework.transaction.IllegalTransactionStateException;
@@ -35,6 +29,11 @@ import org.springframework.transaction.TransactionException;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.TransactionSuspensionNotSupportedException;
 import org.springframework.transaction.UnexpectedRollbackException;
+
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.Serializable;
+import java.util.List;
 
 /**
  * Abstract base class that implements Spring's standard transaction workflow,
@@ -404,6 +403,7 @@ public abstract class AbstractPlatformTransactionManager implements PlatformTran
 			boolean debugEnabled, @Nullable SuspendedResourcesHolder suspendedResources) {
 
 		// 是否开启一个新的TransactionSynchronization
+		//用于标识是否将当前事务的信息记录到当前的线程中
 		boolean newSynchronization = (getTransactionSynchronization() != SYNCHRONIZATION_NEVER);
 
 		// 开启的这个事务的状态信息：
@@ -414,6 +414,7 @@ public abstract class AbstractPlatformTransactionManager implements PlatformTran
 		// 开启事务
 		doBegin(transaction, definition);
 
+		//// 新同步事务的设置，针对于当期线程的设置
 		// 如果需要新开一个TransactionSynchronization，就把新创建的事务的一些状态信息设置到TransactionSynchronizationManager中
 		prepareSynchronization(status, definition);
 		return status;
@@ -431,7 +432,7 @@ public abstract class AbstractPlatformTransactionManager implements PlatformTran
 					"Existing transaction found for transaction marked with propagation 'never'");
 		}
 
-		if (definition.getPropagationBehavior() == TransactionDefinition.PROPAGATION_NOT_SUPPORTED) {
+		if (definition.getPropagationBehavior() == TransactionDefinition.PROPAGATION_NOT_SUPPORTED) {//它的定义是：如果当前有事务运行，则会将该事务挂起（暂停）；如果当前没有事务运行，则它也不会运行在事务中。这态度更无所谓了，有事务它反而不稀罕，简单概括下就是：有我不要，没有正好。
 			if (debugEnabled) {
 				logger.debug("Suspending current transaction");
 			}
@@ -442,7 +443,7 @@ public abstract class AbstractPlatformTransactionManager implements PlatformTran
 					definition, null, false, newSynchronization, debugEnabled, suspendedResources);
 		}
 
-		if (definition.getPropagationBehavior() == TransactionDefinition.PROPAGATION_REQUIRES_NEW) {
+		if (definition.getPropagationBehavior() == TransactionDefinition.PROPAGATION_REQUIRES_NEW) {//如果当前没有事务运行，则会开启一个新的事务；如果当前已经有事务运行，则会将原事务挂起（暂停），重新开启一个新的事务。当新的事务运行完毕后，再将原来的事务释放。简单的概括：你没有，我开启；你有了，我造新的。
 			if (debugEnabled) {
 				logger.debug("Suspending current transaction, creating new transaction with name [" +
 						definition.getName() + "]");
@@ -457,6 +458,9 @@ public abstract class AbstractPlatformTransactionManager implements PlatformTran
 			}
 		}
 
+		//这个 NESTED 是最特殊的，它就是基于保存点 SavePoint 的传播行为。它的定义是：如果当前没有事务运行，则开启一个新的事务；如果当前已经有事务运行，则会记录一个保存点，并继续运行在当前事务中。如果子事务运行中出现异常，则不会全部回滚，而是回滚到上一个保存点。可以发现，这个设计就是保存点的设计，所以简单概括就可以是：你没有，我开启，你有了，你记下；我走了，你再走，我挂了，就当无事发生。
+		//由于在 NESTED 的执行需要依赖关系型数据库的 SavePoint 机制，所以这种传播行为只适用于 DataSourceTransactionManager （即基于数据源的事务管理器）。
+		//而且 NESTED 通常都在同一个数据源中实现，对于多数据源，或者分布式数据库的话，NESTED 是搞不定的（假设两个 Service 依赖的 Dao 分别操作不同的数据库，那实际上已经形成分布式事务了，Spring 搞不定的）。
 		if (definition.getPropagationBehavior() == TransactionDefinition.PROPAGATION_NESTED) {
 			if (!isNestedTransactionAllowed()) {
 				throw new NestedTransactionNotSupportedException(
@@ -545,9 +549,12 @@ public abstract class AbstractPlatformTransactionManager implements PlatformTran
 
 	/**
 	 * Initialize transaction synchronization as appropriate.
+	 * 其目的是将事务信息记录到当前线程中
 	 */
 	protected void prepareSynchronization(DefaultTransactionStatus status, TransactionDefinition definition) {
+		// 如果是新的事务，则需要同步信息
 		if (status.isNewSynchronization()) {
+			// 下面是对事务的信息的记录，记录到当前线程中。
 			TransactionSynchronizationManager.setActualTransactionActive(status.hasTransaction());
 			TransactionSynchronizationManager.setCurrentTransactionIsolationLevel(
 					definition.getIsolationLevel() != TransactionDefinition.ISOLATION_DEFAULT ?

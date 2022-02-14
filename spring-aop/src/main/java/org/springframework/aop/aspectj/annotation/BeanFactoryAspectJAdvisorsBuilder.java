@@ -16,19 +16,18 @@
 
 package org.springframework.aop.aspectj.annotation;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-
 import org.aspectj.lang.reflect.PerClauseKind;
-
 import org.springframework.aop.Advisor;
 import org.springframework.beans.factory.BeanFactoryUtils;
 import org.springframework.beans.factory.ListableBeanFactory;
 import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Helper for retrieving @AspectJ beans from a BeanFactory and building
@@ -94,6 +93,7 @@ public class BeanFactoryAspectJAdvisorsBuilder {
 					aspectNames = new ArrayList<>();
 
 					// 把所有beanNames拿出来遍历，判断某个bean的类型是否是Aspect
+					//这一段的核心逻辑，是将 IOC 容器，以及它的父 IOC 容器中，所有的 bean 的名称全部取出（直接声明父类型为 Object ，显然是取所有），之后，它会逐个解析这些 bean 对应的 Class
 					String[] beanNames = BeanFactoryUtils.beanNamesForTypeIncludingAncestors(
 							this.beanFactory, Object.class, true, false);
 					for (String beanName : beanNames) {
@@ -106,11 +106,13 @@ public class BeanFactoryAspectJAdvisorsBuilder {
 						if (beanType == null) {
 							continue;
 						}
-						if (this.advisorFactory.isAspect(beanType)) {
+						if (this.advisorFactory.isAspect(beanType)) {//判断这个bean是不是被Aspect注解了，即，它是不是一个切面
+							// 当前解析bean的所属类型是一个切面类
 							aspectNames.add(beanName);
 							// 切面的注解信息
 							AspectMetadata amd = new AspectMetadata(beanType, beanName);
 
+							// 下面是单实例切面bean会走的流程
 							// 如果@Aspect不是perthis、pertarget，那么一个切面只会生成一个对象（单例）
 							// 并且会将该切面中所对应的Advisor对象进行缓存
 							if (amd.getAjType().getPerClause().getKind() == PerClauseKind.SINGLETON) {
@@ -118,6 +120,7 @@ public class BeanFactoryAspectJAdvisorsBuilder {
 								MetadataAwareAspectInstanceFactory factory =
 										new BeanFactoryAspectInstanceFactory(this.beanFactory, beanName);
 								// 利用BeanFactoryAspectInstanceFactory来解析Aspect类
+								// 解析生成增强器
 								List<Advisor> classAdvisors = this.advisorFactory.getAdvisors(factory);
 								if (this.beanFactory.isSingleton(beanName)) {
 									// 缓存切面所对应的所有Advisor对象
@@ -130,6 +133,8 @@ public class BeanFactoryAspectJAdvisorsBuilder {
 							}
 							else {
 								// Per target or per this.
+								//对于原型切面 bean 的解析，它的核心解析动作依然是 advisorFactory.getAdvisors 方法，
+								// 只是这里面不会再用到 advisorsCache 这个缓存区了，这也说明原型切面 bean 的解析是多次执行的
 								if (this.beanFactory.isSingleton(beanName)) {
 									throw new IllegalArgumentException("Bean with name '" + beanName +
 											"' is a singleton, but aspect instantiation model is not singleton");
@@ -141,6 +146,7 @@ public class BeanFactoryAspectJAdvisorsBuilder {
 								// PrototypeAspectInstanceFactory的父类为BeanFactoryAspectInstanceFactory
 								// 这两个Factory的区别在于PrototypeAspectInstanceFactory的构造方法中会判断切面Bean是不是原型，除此之外没有其他区别
 								// 所以主要就是BeanFactoryAspectInstanceFactory来负责生成切面实例对象
+								//// 解析Aspect切面类，构造增强器
 								advisors.addAll(this.advisorFactory.getAdvisors(factory));
 							}
 						}

@@ -16,20 +16,9 @@
 
 package org.springframework.aop.framework.autoproxy;
 
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Proxy;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-
 import org.aopalliance.aop.Advice;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
 import org.springframework.aop.Advisor;
 import org.springframework.aop.Pointcut;
 import org.springframework.aop.TargetSource;
@@ -51,6 +40,16 @@ import org.springframework.core.SmartClassLoader;
 import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
+
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Proxy;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * {@link org.springframework.beans.factory.config.BeanPostProcessor} implementation
@@ -246,10 +245,13 @@ public abstract class AbstractAutoProxyCreator extends ProxyProcessorSupport
 	public Object postProcessBeforeInstantiation(Class<?> beanClass, String beanName) {
 		Object cacheKey = getCacheKey(beanClass, beanName);
 
+		//决定是否要提前增强当前bean
 		if (!StringUtils.hasLength(beanName) || !this.targetSourcedBeans.contains(beanName)) {
+			// 被增强过的bean不会再次被增强
 			if (this.advisedBeans.containsKey(cacheKey)) {
 				return null;
 			}
+			// 基础类型的bean不会被提前增强、被跳过的bean不会被提前增强
 			if (isInfrastructureClass(beanClass) || shouldSkip(beanClass, beanName)) {
 				this.advisedBeans.put(cacheKey, Boolean.FALSE);
 				return null;
@@ -260,6 +262,8 @@ public abstract class AbstractAutoProxyCreator extends ProxyProcessorSupport
 		// Suppresses unnecessary default instantiation of the target bean:
 		// The TargetSource will handle target instances in a custom fashion.
 		// 这里是BeanNameAutoProxyCreator的判断逻辑
+		// 原型bean的额外处理：TargetSource
+		// 此处的设计与自定义TargetSource相关，单实例bean必定返回null
 		TargetSource targetSource = getCustomTargetSource(beanClass, beanName);
 		if (targetSource != null) {
 			if (StringUtils.hasLength(beanName)) {
@@ -326,6 +330,7 @@ public abstract class AbstractAutoProxyCreator extends ProxyProcessorSupport
 	 * @return a proxy wrapping the bean, or the raw bean instance as-is
 	 */
 	protected Object wrapIfNecessary(Object bean, String beanName, Object cacheKey) {
+		//判断决定是否是不会被增强的 bean
 		if (StringUtils.hasLength(beanName) && this.targetSourcedBeans.contains(beanName)) {
 			return bean;
 		}
@@ -394,6 +399,7 @@ public abstract class AbstractAutoProxyCreator extends ProxyProcessorSupport
 	 * @see org.springframework.beans.factory.config.AutowireCapableBeanFactory#ORIGINAL_INSTANCE_SUFFIX
 	 */
 	protected boolean shouldSkip(Class<?> beanClass, String beanName) {
+		// 检查beanName代表的是不是原始对象(以.ORIGINAL结尾)
 		return AutoProxyUtils.isOriginalInstance(beanName, beanClass);
 	}
 
@@ -443,13 +449,16 @@ public abstract class AbstractAutoProxyCreator extends ProxyProcessorSupport
 	protected Object createProxy(Class<?> beanClass, @Nullable String beanName,
 			@Nullable Object[] specificInterceptors, TargetSource targetSource) {
 
+		// 记录被代理bean的原始类型
 		if (this.beanFactory instanceof ConfigurableListableBeanFactory) {
 			AutoProxyUtils.exposeTargetClass((ConfigurableListableBeanFactory) this.beanFactory, beanName, beanClass);
 		}
 
+		// 代理工厂的初始化
 		ProxyFactory proxyFactory = new ProxyFactory();
 		proxyFactory.copyFrom(this);
 
+		// 根据AOP的设计，决定是否强制使用Cglib
 		if (proxyFactory.isProxyTargetClass()) {
 			// Explicit handling of JDK proxy targets (for introduction advice scenarios)
 			if (Proxy.isProxyClass(beanClass)) {
@@ -465,10 +474,12 @@ public abstract class AbstractAutoProxyCreator extends ProxyProcessorSupport
 				proxyFactory.setProxyTargetClass(true);
 			}
 			else {
+				// 解析被代理bean所属类的所有实现的接口
 				evaluateProxyInterfaces(beanClass, proxyFactory);
 			}
 		}
 
+		//构造整合所有增强器
 		Advisor[] advisors = buildAdvisors(beanName, specificInterceptors);
 		// 在这一步会去判断advisors中是否存在IntroductionAdvisor，如果存在则会把对应的interface添加到proxyFactory中去
 		proxyFactory.addAdvisors(advisors);
@@ -526,6 +537,7 @@ public abstract class AbstractAutoProxyCreator extends ProxyProcessorSupport
 	 */
 	protected Advisor[] buildAdvisors(@Nullable String beanName, @Nullable Object[] specificInterceptors) {
 		// Handle prototypes correctly...
+		// 这个地方是适配Spring原生AOP的MethodInterceptor，感兴趣的小伙伴可自行研究
 		Advisor[] commonInterceptors = resolveInterceptorNames();
 
 		List<Object> allInterceptors = new ArrayList<>();

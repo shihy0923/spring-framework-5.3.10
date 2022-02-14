@@ -16,13 +16,13 @@
 
 package org.springframework.aop.aspectj;
 
-import java.util.List;
-
 import org.springframework.aop.Advisor;
 import org.springframework.aop.PointcutAdvisor;
 import org.springframework.aop.interceptor.ExposeInvocationInterceptor;
 import org.springframework.lang.Nullable;
 import org.springframework.util.StringUtils;
+
+import java.util.List;
 
 /**
  * Utility methods for working with AspectJ proxies.
@@ -56,6 +56,7 @@ public abstract class AspectJProxyUtils {
 					break;
 				}
 			}
+			// 发现有AspectJ包装的增强器，则添加一个ExposeInvocationInterceptor
 			if (foundAspectJAdvice && !advisors.contains(ExposeInvocationInterceptor.ADVISOR)) {
 				advisors.add(0, ExposeInvocationInterceptor.ADVISOR);
 				return true;

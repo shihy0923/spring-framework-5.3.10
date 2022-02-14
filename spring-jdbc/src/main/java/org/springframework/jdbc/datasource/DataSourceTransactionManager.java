@@ -16,12 +16,6 @@
 
 package org.springframework.jdbc.datasource;
 
-import java.sql.Connection;
-import java.sql.SQLException;
-import java.sql.Statement;
-
-import javax.sql.DataSource;
-
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.lang.Nullable;
 import org.springframework.transaction.CannotCreateTransactionException;
@@ -33,6 +27,11 @@ import org.springframework.transaction.support.ResourceTransactionManager;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionSynchronizationUtils;
 import org.springframework.util.Assert;
+
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.Statement;
 
 /**
  * {@link org.springframework.transaction.PlatformTransactionManager}
@@ -302,6 +301,8 @@ public class DataSourceTransactionManager extends AbstractPlatformTransactionMan
 
 			// Bind the connection holder to the thread.
 			// 把新建的数据库连接设置到resources中，resources就是一个ThreadLocal<Map<Object, Object>>，事务管理器中的设置的DataSource对象为key，数据库连接对象为value
+			//比如我们用的是Mybatis，最后会在获取数据库连接的时候，org.apache.ibatis.executor.BaseExecutor.getConnection方法中，
+			//调用到org.mybatis.spring.transaction.SpringManagedTransaction.getConnection方法，从当前线程中获取这个ConnectionHolder对象，然后使用
 			if (txObject.isNewConnectionHolder()) {
 				TransactionSynchronizationManager.bindResource(obtainDataSource(), txObject.getConnectionHolder());
 			}

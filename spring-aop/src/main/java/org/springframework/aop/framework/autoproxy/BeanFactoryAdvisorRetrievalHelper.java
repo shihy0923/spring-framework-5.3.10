@@ -16,12 +16,8 @@
 
 package org.springframework.aop.framework.autoproxy;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
 import org.springframework.aop.Advisor;
 import org.springframework.beans.factory.BeanCreationException;
 import org.springframework.beans.factory.BeanCurrentlyInCreationException;
@@ -29,6 +25,9 @@ import org.springframework.beans.factory.BeanFactoryUtils;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Helper for retrieving standard Spring Advisors from a BeanFactory,
@@ -66,18 +65,21 @@ public class BeanFactoryAdvisorRetrievalHelper {
 	 */
 	public List<Advisor> findAdvisorBeans() {
 		// Determine list of advisor bean names, if not cached already.
+		// 确定增强器bean名称的列表（如果尚未缓存）
 		String[] advisorNames = this.cachedAdvisorBeanNames;
 		if (advisorNames == null) {
 			// Do not initialize FactoryBeans here: We need to leave all regular beans
 			// uninitialized to let the auto-proxy creator apply to them!
+			// 不要在这里初始化FactoryBeans：
+			// 我们需要保留所有未初始化的常规bean，以使自动代理创建者对其应用
 			advisorNames = BeanFactoryUtils.beanNamesForTypeIncludingAncestors(
 					this.beanFactory, Advisor.class, true, false);
 			this.cachedAdvisorBeanNames = advisorNames;
 		}
-		if (advisorNames.length == 0) {
+		if (advisorNames.length == 0) { // 如果当前IOC容器中没有任何增强器类型的bean，直接返回
 			return new ArrayList<>();
 		}
-
+        //初始化原生增强器
 		List<Advisor> advisors = new ArrayList<>();
 		for (String name : advisorNames) {
 			if (isEligibleBean(name)) {
