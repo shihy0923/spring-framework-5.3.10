@@ -16,16 +16,16 @@
 
 package org.springframework.aop.aspectj.annotation;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.regex.Pattern;
-
 import org.springframework.aop.Advisor;
 import org.springframework.aop.aspectj.autoproxy.AspectJAwareAdvisorAutoProxyCreator;
 import org.springframework.beans.factory.ListableBeanFactory;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Pattern;
 
 /**
  * {@link AspectJAwareAdvisorAutoProxyCreator} subclass that processes all AspectJ
@@ -86,14 +86,20 @@ public class AnnotationAwareAspectJAutoProxyCreator extends AspectJAwareAdvisorA
 	}
 
 
+	//总共两个步骤，分别代表切面的两个来源：SpringFramework 原生 AOP 的增强器，
+	//以及解析完 AspectJ 切面类构造的增强器
 	@Override
 	protected List<Advisor> findCandidateAdvisors() {
 		// Add all the Spring advisors found according to superclass rules.
-		// 先找到所有Advisor类型的Bean对象
+		//1 先找到所有Advisor类型的Bean对象
+		//根据父类的规则添加所有找到的Spring原生的增强器
+		// SpringFramework 原生的增强器，因为编写它实在是太复杂了，主流的编写还是以 AspectJ 形式为主，所以咱这里知道一下就可以了。
 		List<Advisor> advisors = super.findCandidateAdvisors();
 
 		// Build Advisors for all AspectJ aspects in the bean factory.
-		// 再从所有切面中解析得到Advisor对象
+		// 2 再从所有切面中解析得到Advisor对象
+		// 解析BeanFactory中所有的AspectJ切面，并构造增强器
+		//从方法名上理解，它就是将 Aspect 切面类，转换为一个一个的增强器
 		if (this.aspectJAdvisorsBuilder != null) {
 			advisors.addAll(this.aspectJAdvisorsBuilder.buildAspectJAdvisors());
 		}
