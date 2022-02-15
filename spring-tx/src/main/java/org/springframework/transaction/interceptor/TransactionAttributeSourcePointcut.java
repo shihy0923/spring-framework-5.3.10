@@ -16,15 +16,15 @@
 
 package org.springframework.transaction.interceptor;
 
-import java.io.Serializable;
-import java.lang.reflect.Method;
-
 import org.springframework.aop.ClassFilter;
 import org.springframework.aop.support.StaticMethodMatcherPointcut;
 import org.springframework.dao.support.PersistenceExceptionTranslator;
 import org.springframework.lang.Nullable;
 import org.springframework.transaction.TransactionManager;
 import org.springframework.util.ObjectUtils;
+
+import java.io.Serializable;
+import java.lang.reflect.Method;
 
 /**
  * Abstract class that implements a Pointcut that matches if the underlying
@@ -43,6 +43,8 @@ abstract class TransactionAttributeSourcePointcut extends StaticMethodMatcherPoi
 
 	@Override
 	public boolean matches(Method method, Class<?> targetClass) {
+		//获取org.springframework.transaction.annotation.ProxyTransactionManagementConfiguration引入的
+		// 那个对象(见org.springframework.transaction.annotation.ProxyTransactionManagementConfiguration.transactionAttributeSource()方法)
 		TransactionAttributeSource tas = getTransactionAttributeSource();
 		return (tas == null || tas.getTransactionAttribute(method, targetClass) != null);
 	}

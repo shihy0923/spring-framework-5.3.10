@@ -120,8 +120,7 @@ public class BeanFactoryAspectJAdvisorsBuilder {
 
 								MetadataAwareAspectInstanceFactory factory =
 										new BeanFactoryAspectInstanceFactory(this.beanFactory, beanName);
-								// 利用BeanFactoryAspectInstanceFactory来解析Aspect类
-								// 生成Advisor
+								// 利用BeanFactoryAspectInstanceFactory来解析Aspect类, 生成该切面中所有的Advisor
 								List<Advisor> classAdvisors = this.advisorFactory.getAdvisors(factory);
 								if (this.beanFactory.isSingleton(beanName)) {
 									// 缓存切面所对应的所有Advisor对象
@@ -152,17 +151,18 @@ public class BeanFactoryAspectJAdvisorsBuilder {
 							}
 						}
 					}
+					//把所有的切面类的bean名称缓存
 					this.aspectBeanNames = aspectNames;
 					return advisors;
 				}
 			}
-		}
+		}//这个分支走完后，容器中的所有切面都已经被解析完毕了，并放入org.springframework.aop.aspectj.annotation.BeanFactoryAspectJAdvisorsBuilder.advisorsCache这个缓存中了
 
 		if (aspectNames.isEmpty()) {
 			return Collections.emptyList();
 		}
 
-		// 如果切面已经找到过了，那么则遍历每个切面是否缓存了对应的Advisor，如果没有缓存则进行解析得到Advisor
+		// 如果走到这，说明之前已经解析过了所有的切面，直接从缓存里面拿就行了
 		List<Advisor> advisors = new ArrayList<>();
 		for (String aspectName : aspectNames) {
 			List<Advisor> cachedAdvisors = this.advisorsCache.get(aspectName);

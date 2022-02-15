@@ -225,12 +225,16 @@ public abstract class AopUtils {
 		Assert.notNull(pc, "Pointcut must not be null");
 		// 判断targetClass是不是和当前Pointcut匹配
 
-		// 先判断类
-		// 连类都切入不进去，那干脆没必要往下走了
+		//先判断类是否符合该Advisor要增强的，就是Advisor中的Pointcut来判断的，这就体现了Pointcut的作用了
+		//Spring事务的看org.springframework.transaction.annotation.AnnotationTransactionAttributeSource.isCandidateClass
+		//普通AOP的看org.springframework.aop.aspectj.AspectJExpressionPointcut.matches(java.lang.Class<?>)
 		if (!pc.getClassFilter().matches(targetClass)) {
+			//连类都切入不进去，那干脆没必要往下走了
 			return false;
 		}
-
+        //再判断方法
+		//Spring事务的看BeanFactoryTransactionAttributeSourceAdvisor中的成员变量pointcut这个匿名对象，其实methodMatcher和pc是同一个对象
+		//普通AOP的看AspectJExpressionPointcut,其实methodMatcher和pc是同一个对象
 		MethodMatcher methodMatcher = pc.getMethodMatcher();
 		if (methodMatcher == MethodMatcher.TRUE) {
 			// No need to iterate the methods if we're matching any method anyway...
@@ -239,7 +243,7 @@ public abstract class AopUtils {
 
 		// 针对引介通知的匹配
 		IntroductionAwareMethodMatcher introductionAwareMethodMatcher = null;
-		if (methodMatcher instanceof IntroductionAwareMethodMatcher) {
+		if (methodMatcher instanceof IntroductionAwareMethodMatcher) {//普通的AOP这里是true，Spring事务在这里是false
 			introductionAwareMethodMatcher = (IntroductionAwareMethodMatcher) methodMatcher;
 		}
 
@@ -250,12 +254,15 @@ public abstract class AopUtils {
 		classes.addAll(ClassUtils.getAllInterfacesForClassAsSet(targetClass));
 
 		for (Class<?> clazz : classes) {
-			//// 逐个判断每个方法是否能被当前切入点表达式切入，切入则立即返回true
+			// 拿到bean对象所对应的类里面的所有方法。只要有一个方法符合PointCut，就表示这个bean对象符合被这个Advisor增强，后面的方法就不用接着判断了
 			Method[] methods = ReflectionUtils.getAllDeclaredMethods(clazz);
 			for (Method method : methods) {
 				if (introductionAwareMethodMatcher != null ?
+						//在判断方法是否匹配
+						//Spring事务的看org.springframework.transaction.interceptor.TransactionAttributeSourcePointcut.matches，看方法上有没有@Transactional这个注解
+						//普通AOP的看org.springframework.aop.aspectj.AspectJExpressionPointcut.matches(java.lang.reflect.Method, java.lang.Class<?>, boolean),看方
+						// 法是否满足AspectJExpressionPointcut中的PointcutExpression对象所标识的切点表达式，见方法org.aspectj.weaver.internal.tools.PointcutExpressionImpl.matchesExecution
 						introductionAwareMethodMatcher.matches(method, targetClass, hasIntroductions) :
-						// 在判断方法是否匹配
 						methodMatcher.matches(method, targetClass)) {
 					return true;
 				}
@@ -288,12 +295,13 @@ public abstract class AopUtils {
 	 * @return whether the pointcut can apply on any method
 	 */
 	public static boolean canApply(Advisor advisor, Class<?> targetClass, boolean hasIntroductions) {
-		//// 对于引介增强器，它会直接强转，使用类级别的过滤器去匹配
+		// 对于引介增强器，它会直接强转，使用类级别的过滤器去匹配
 		if (advisor instanceof IntroductionAdvisor) {
 			return ((IntroductionAdvisor) advisor).getClassFilter().matches(targetClass);
 		}
-		else if (advisor instanceof PointcutAdvisor) {// 方法切入点的增强器匹配逻辑
+		else if (advisor instanceof PointcutAdvisor) {// 方法切入点的Advisor匹配逻辑
 			PointcutAdvisor pca = (PointcutAdvisor) advisor;
+			//判断当前生成的Bean对象，是否和当前的Advisor匹配
 			return canApply(pca.getPointcut(), targetClass, hasIntroductions);
 		}
 		else {
@@ -315,7 +323,7 @@ public abstract class AopUtils {
 			return candidateAdvisors;
 		}
 		List<Advisor> eligibleAdvisors = new ArrayList<>();
-		// 先匹配引介Advisor
+		//先匹配引介Advisor
 		//引介Advisor的匹配咱就不多研究了，本来平时就用得少
 		//事务的BeanFactoryTransactionAttributeSourceAdvisor也不是这个类型，所以这个代码可以不管他
 		for (Advisor candidate : candidateAdvisors) {
@@ -324,7 +332,7 @@ public abstract class AopUtils {
 			}
 		}
 		boolean hasIntroductions = !eligibleAdvisors.isEmpty();
-		// 再匹配普通方法增强器
+		// 再匹配普通方法的Advisor
 		for (Advisor candidate : candidateAdvisors) {
 			if (candidate instanceof IntroductionAdvisor) {
 				// already processed

@@ -73,7 +73,7 @@ public class ReflectiveAspectJAdvisorFactory extends AbstractAspectJAdvisorFacto
 	// Exclude @Pointcut methods
 	private static final MethodFilter adviceMethodFilter = ReflectionUtils.USER_DECLARED_METHODS
 			.and(method -> (AnnotationUtils.getAnnotation(method, Pointcut.class) == null));
-
+    //先根据Aspect相关注解进行排序，比较出来结果直接返回。比较不出来，根据方法名进行排序，即字符串排序
 	private static final Comparator<Method> adviceMethodComparator;
 
 	static {
@@ -82,6 +82,9 @@ public class ReflectiveAspectJAdvisorFactory extends AbstractAspectJAdvisorFacto
 		// @AfterThrowing methods due to the fact that AspectJAfterAdvice.invoke(MethodInvocation)
 		// invokes proceed() in a `try` block and only invokes the @After advice method
 		// in a corresponding `finally` block.
+		//adviceKindComparator这个比较器，根据方法上的Aspect相关注解进行排序。如果方法上面没有放Aspect相关的注解，则会将优先级设置为org.springframework.util.comparator.InstanceComparator.instanceOrder这个集合的长度，
+		// 即优先级为5(见方法org.springframework.util.comparator.InstanceComparator.getOrder)，优先级最低。
+		//这个集合哪里来的呢，其实就是下面	new InstanceComparator（....）这行代码传入的参数长度，它是个变长数组。
 		Comparator<Method> adviceKindComparator = new ConvertingComparator<>(
 				new InstanceComparator<>(
 						Around.class, Before.class, After.class, AfterReturning.class, AfterThrowing.class),
@@ -89,7 +92,11 @@ public class ReflectiveAspectJAdvisorFactory extends AbstractAspectJAdvisorFacto
 					AspectJAnnotation<?> ann = AbstractAspectJAdvisorFactory.findAspectJAnnotationOnMethod(method);
 					return (ann != null ? ann.getAnnotation() : null);
 				});
+		//methodNameComparator这个比较器，根据方法的名称排序。即根据方法名进行字符串排序
 		Comparator<Method> methodNameComparator = new ConvertingComparator<>(Method::getName);
+		//这行代码的意思构造一个比较器，如果adviceKindComparator这个比较器比较出来了结果，那么就直接返回比较结果
+		//如果adviceKindComparator这个比较器比较不出来结果，比如，两个方法上都用了@Before注解,adviceKindComparator就比较不出来优先级了，那么就会用
+		//adviceKindComparator这个比较器，根据方法名进行排序
 		adviceMethodComparator = adviceKindComparator.thenComparing(methodNameComparator);
 	}
 
@@ -128,14 +135,14 @@ public class ReflectiveAspectJAdvisorFactory extends AbstractAspectJAdvisorFacto
 		// We need to wrap the MetadataAwareAspectInstanceFactory with a decorator
 		// so that it will only instantiate once.
 		// 保证切面Bean对象只会实例化一次
-		//没那么玄乎，看它的getAspectInstance方法
+		//没那么玄乎，看它的getAspectInstance方法，只是会先会从缓存中获取缓存对象，如果没有，则从容器中利用getBean方法获取，再放入缓存中
 		MetadataAwareAspectInstanceFactory lazySingletonAspectInstanceFactory =
 				new LazySingletonAspectInstanceFactoryDecorator(aspectInstanceFactory);
 
 		List<Advisor> advisors = new ArrayList<>();
-		// 获取切面类中没有加@Pointcut的方法，且标注了@Before这些注解的方法，进行遍历生成Advisor
-		// 逐个解析通知方法，并封装为Advisor
-		for (Method method : getAdvisorMethods(aspectClass)) {
+		// getAdvisorMethods(aspectClass)这行代码，获取切面类中只要没有加@Pointcut注解的所有方法（也包含父类的所有方法，下面的getAdvisor方法过滤掉无Aspect相关注解的方法），
+		// 并且根据方法上的Aspect相关的注解和方法名，对方法进行排序。这是对切面内的Advisor排序。也是对于整个AOP来讲，第一次对Advisor进行排序
+		for (Method method : getAdvisorMethods(aspectClass)) {//进行遍历生成Advisor
 			// Prior to Spring Framework 5.2.7, advisors.size() was supplied as the declarationOrderInAspect
 			// to getAdvisor(...) to represent the "current position" in the declared methods list.
 			// However, since Java 7 the "current position" is not valid since the JDK no longer
@@ -144,7 +151,7 @@ public class ReflectiveAspectJAdvisorFactory extends AbstractAspectJAdvisorFacto
 			// discovered via reflection in order to support reliable advice ordering across JVM launches.
 			// Specifically, a value of 0 aligns with the default value used in
 			// AspectJPrecedenceComparator.getAspectDeclarationOrder(Advisor).
-			//上面的getAdvisorMethods方法只是取出了自己定义的非 @Pointcut 方法，那对于没有声明切入点表达式的方法，它岂不是也一起返回了？不过没关系，其实它在这里又做了一次过滤
+			//上面的getAdvisorMethods方法只是取出了自己定义的非 @Pointcut 方法，那对于没有声明Aspect相关的注解的方法，它岂不是也一起返回了？不过没关系，其实它在这里又做了一次过滤
 			Advisor advisor = getAdvisor(method, lazySingletonAspectInstanceFactory, 0, aspectName);
 			if (advisor != null) {
 				advisors.add(advisor);
@@ -178,9 +185,9 @@ public class ReflectiveAspectJAdvisorFactory extends AbstractAspectJAdvisorFacto
 
 	private List<Method> getAdvisorMethods(Class<?> aspectClass) {
 		List<Method> methods = new ArrayList<>();
-		// 拿到切面类中所有没有加@Pointcut的方法
+		// 拿到切面类中所有没有加@Pointcut的方法（无Aspect相关的注解的方法包括父类的也会被返回）
 		ReflectionUtils.doWithMethods(aspectClass, methods::add, adviceMethodFilter);
-		// 对方法进行排序，按注解和方法名字进行排序
+		// 对方法进行排序，按注解和方法名字进行排序，看adviceMethodComparator这个比较器
 		if (methods.size() > 1) {
 			methods.sort(adviceMethodComparator);
 		}

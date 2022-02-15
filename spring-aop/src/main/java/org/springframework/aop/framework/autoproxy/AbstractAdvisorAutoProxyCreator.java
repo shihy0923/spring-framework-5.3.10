@@ -96,17 +96,21 @@ public abstract class AbstractAdvisorAutoProxyCreator extends AbstractAutoProxyC
 	 * 中被调用，即在生成代理对象的时候
 	 */
 	protected List<Advisor> findEligibleAdvisors(Class<?> beanClass, String beanName) {
-		//获取所有的Advisor，注意这里并没有对的Advisor进行排序
+		//获取所有的Advisor，这个方法其实前面已经被调用过了(在org.springframework.aop.aspectj.autoproxy.AspectJAwareAdvisorAutoProxyCreator.shouldSkip方法中被调用)，
+		//因此直接都缓存里面获取就好了
 		List<Advisor> candidateAdvisors = findCandidateAdvisors();
-		// 进行筛选
-		// 筛选出可以切入当前bean的增强器
+		//进行筛选
+		//筛选出可以切入当前bean的Advisor
 		List<Advisor> eligibleAdvisors = findAdvisorsThatCanApply(candidateAdvisors, beanClass, beanName);
 
-		// 添加额外的增强器
+		//添加额外的增强器
 		//这里会添加ExposeInvocationInterceptor.ADVISOR
 		extendAdvisors(eligibleAdvisors);
 
-		// 对Advisor进行排序，按Ordered接口、@Order注解进行排序
+		//注意：到这里，又对Advisor进行排序，第一次排序是在org.springframework.aop.aspectj.annotation.ReflectiveAspectJAdvisorFactory.getAdvisorMethods方法中，不过这是对一个切面范围内的排序。
+		//这里的排序是对所有符合条件的Advisor进行排序
+		//对Advisor进行排序，按Ordered接口、@Order注解进行排序
+		//一般不会在这里有什么太大改变
 		if (!eligibleAdvisors.isEmpty()) {
 			eligibleAdvisors = sortAdvisors(eligibleAdvisors);
 		}
