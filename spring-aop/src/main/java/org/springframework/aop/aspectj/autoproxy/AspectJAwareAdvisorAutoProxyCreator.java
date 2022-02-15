@@ -97,7 +97,7 @@ public class AspectJAwareAdvisorAutoProxyCreator extends AbstractAdvisorAutoProx
 	@Override
 	protected boolean shouldSkip(Class<?> beanClass, String beanName) {
 		// TODO: Consider optimization by caching the list of the aspect names
-		// 加载增强器
+		// 加载所有的增强器Advisor，这时候并没有对Advisor进行排序，排序的动作在org.springframework.aop.framework.autoproxy.AbstractAdvisorAutoProxyCreator#findEligibleAdvisors方法中
 		List<Advisor> candidateAdvisors = findCandidateAdvisors();
 		for (Advisor advisor : candidateAdvisors) {
 			// 逐个匹配，如果发现当前bean的名称与增强器的名称一致，则认为应该跳过

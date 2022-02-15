@@ -82,7 +82,7 @@ public class BeanFactoryAspectJAdvisorsBuilder {
 	 * 本方法会被多次调用，因为一个Bean在判断要不要进行AOP时，都会调用这个方法
 	 */
 	public List<Advisor> buildAspectJAdvisors() {
-		// aspectBeanNames是用来缓存BeanFactory中所存在的切面beanName的，第一次为null，后面就不为null了，不为null表示之前就已经找到过BeanFactory中的切面了
+		// aspectBeanNames是用来缓存BeanFactory中所存在的切面类的beanName的，第一次为null，后面就不为null了，不为null表示之前就已经找到过BeanFactory中的切面了
 		List<String> aspectNames = this.aspectBeanNames;
 
 		if (aspectNames == null) {
@@ -102,6 +102,7 @@ public class BeanFactoryAspectJAdvisorsBuilder {
 						}
 						// We must be careful not to instantiate beans eagerly as in this case they
 						// would be cached by the Spring container but would not have been weaved.
+						//根据beanName获取对应的类型
 						Class<?> beanType = this.beanFactory.getType(beanName, false);
 						if (beanType == null) {
 							continue;
@@ -120,7 +121,7 @@ public class BeanFactoryAspectJAdvisorsBuilder {
 								MetadataAwareAspectInstanceFactory factory =
 										new BeanFactoryAspectInstanceFactory(this.beanFactory, beanName);
 								// 利用BeanFactoryAspectInstanceFactory来解析Aspect类
-								// 解析生成增强器
+								// 生成Advisor
 								List<Advisor> classAdvisors = this.advisorFactory.getAdvisors(factory);
 								if (this.beanFactory.isSingleton(beanName)) {
 									// 缓存切面所对应的所有Advisor对象

@@ -16,15 +16,14 @@
 
 package org.springframework.context.annotation;
 
-import java.util.Set;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
 import org.springframework.aop.config.AopConfigUtils;
 import org.springframework.beans.factory.support.BeanDefinitionRegistry;
 import org.springframework.core.annotation.AnnotationAttributes;
 import org.springframework.core.type.AnnotationMetadata;
+
+import java.util.Set;
 
 /**
  * Registers an auto proxy creator against the current {@link BeanDefinitionRegistry}
@@ -58,21 +57,26 @@ public class AutoProxyRegistrar implements ImportBeanDefinitionRegistrar {
 	@Override
 	public void registerBeanDefinitions(AnnotationMetadata importingClassMetadata, BeanDefinitionRegistry registry) {
 		boolean candidateFound = false;
+		//启动的时候，获取@Configuration配置类上面，@Import类型注解的字符串全限定名，如@EnableTransactionManagement在这里会解析为"org.springframework.transaction.annotation.EnableTransactionManagement00"
 		Set<String> annTypes = importingClassMetadata.getAnnotationTypes();
 		for (String annType : annTypes) {
+			//获取@Import类型注解里面配置的属性值
 			AnnotationAttributes candidate = AnnotationConfigUtils.attributesFor(importingClassMetadata, annType);
 			if (candidate == null) {
 				continue;
 			}
+			//下面两个属性，来自于@EnableTransactionManagement注解
+			//获取mode值
 			Object mode = candidate.get("mode");
+			//获取proxyTargetClass值，表示是否强制使用cglib代理
 			Object proxyTargetClass = candidate.get("proxyTargetClass");
 			if (mode != null && proxyTargetClass != null && AdviceMode.class == mode.getClass() &&
 					Boolean.class == proxyTargetClass.getClass()) {
 				candidateFound = true;
-				if (mode == AdviceMode.PROXY) {
-					// 注册InfrastructureAdvisorAutoProxyCreator，才可以Bean进行AOP
+				if (mode == AdviceMode.PROXY) {//@EnableTransactionManagement注解的mode属性默认值就是PROXY
+					// 注册InfrastructureAdvisorAutoProxyCreator
 					AopConfigUtils.registerAutoProxyCreatorIfNecessary(registry);
-					if ((Boolean) proxyTargetClass) {
+					if ((Boolean) proxyTargetClass) {//@EnableTransactionManagement注解的proxyTargetClass属性默认值就是false
 						// 设置InfrastructureAdvisorAutoProxyCreator的proxyTargetClass为true
 						AopConfigUtils.forceAutoProxyCreatorToUseClassProxying(registry);
 						return;

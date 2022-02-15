@@ -315,8 +315,9 @@ public abstract class AopUtils {
 			return candidateAdvisors;
 		}
 		List<Advisor> eligibleAdvisors = new ArrayList<>();
-		// 先匹配引介增强器
-		//引介增强器的匹配咱就不多研究了，本来平时就用得少
+		// 先匹配引介Advisor
+		//引介Advisor的匹配咱就不多研究了，本来平时就用得少
+		//事务的BeanFactoryTransactionAttributeSourceAdvisor也不是这个类型，所以这个代码可以不管他
 		for (Advisor candidate : candidateAdvisors) {
 			if (candidate instanceof IntroductionAdvisor && canApply(candidate, clazz)) {
 				eligibleAdvisors.add(candidate);

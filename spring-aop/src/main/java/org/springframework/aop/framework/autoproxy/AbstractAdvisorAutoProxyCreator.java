@@ -92,16 +92,18 @@ public abstract class AbstractAdvisorAutoProxyCreator extends AbstractAutoProxyC
 	 * @see #findCandidateAdvisors
 	 * @see #sortAdvisors
 	 * @see #extendAdvisors
+	 * 该方法会在org.springframework.aop.framework.autoproxy.AbstractAutoProxyCreator#wrapIfNecessary(java.lang.Object, java.lang.String, java.lang.Object)方法的Object[] specificInterceptors = getAdvicesAndAdvisorsForBean(bean.getClass(), beanName, null);
+	 * 中被调用，即在生成代理对象的时候
 	 */
 	protected List<Advisor> findEligibleAdvisors(Class<?> beanClass, String beanName) {
-		// 找到所有的Advisor
-		//获取所有增强器
+		//获取所有的Advisor，注意这里并没有对的Advisor进行排序
 		List<Advisor> candidateAdvisors = findCandidateAdvisors();
 		// 进行筛选
 		// 筛选出可以切入当前bean的增强器
 		List<Advisor> eligibleAdvisors = findAdvisorsThatCanApply(candidateAdvisors, beanClass, beanName);
 
 		// 添加额外的增强器
+		//这里会添加ExposeInvocationInterceptor.ADVISOR
 		extendAdvisors(eligibleAdvisors);
 
 		// 对Advisor进行排序，按Ordered接口、@Order注解进行排序

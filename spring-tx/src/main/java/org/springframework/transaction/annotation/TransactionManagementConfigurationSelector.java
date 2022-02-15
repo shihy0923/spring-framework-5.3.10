@@ -48,7 +48,8 @@ public class TransactionManagementConfigurationSelector extends AdviceModeImport
 		switch (adviceMode) {
 			case PROXY:
 				// 默认是PROXY
-				return new String[] {AutoProxyRegistrar.class.getName(),
+				return new String[] {AutoProxyRegistrar.class.getName(),//如果@EnableTransactionManagement和@EnableAspectJAutoProxy同时使用，AutoProxyRegistrar导入的InfrastructureAdvisorAutoProxyCreator是会被覆盖的，所以这个时候
+						//@EnableTransactionManagement的作用就之后导入下面ProxyTransactionManagementConfiguration这个类了
 						ProxyTransactionManagementConfiguration.class.getName()};
 			case ASPECTJ:
 				// 表示不用动态代理技术，用ASPECTJ技术，比较麻烦了

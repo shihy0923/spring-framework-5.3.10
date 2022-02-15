@@ -128,17 +128,13 @@ public class ReflectiveAspectJAdvisorFactory extends AbstractAspectJAdvisorFacto
 		// We need to wrap the MetadataAwareAspectInstanceFactory with a decorator
 		// so that it will only instantiate once.
 		// 保证切面Bean对象只会实例化一次
-		// 一定要注意，这里是直接new出来一个LazySingletonAspectInstanceFactoryDecorator
-		// 也就是OrderService这个Bean在执行Bean生命周期过程中，会需要判断要不要进行AOP，就会找到切面，
-		// 发现切面如果是pertarget或perthis，那么就会进入到这个方法，就会new一个LazySingletonAspectInstanceFactoryDecorator
-		// 对于UserService也是一样的，在它的Bean的生命周期过程中，也会进入到这个方法，也会new一个LazySingletonAspectInstanceFactoryDecorator
-		//此处利用Decorator装饰者模式，目的是保证Advisor增强器不会被多次实例化
+		//没那么玄乎，看它的getAspectInstance方法
 		MetadataAwareAspectInstanceFactory lazySingletonAspectInstanceFactory =
 				new LazySingletonAspectInstanceFactoryDecorator(aspectInstanceFactory);
 
 		List<Advisor> advisors = new ArrayList<>();
-		// 获取切面类中没有加@Pointcut的方法，进行遍历生成Advisor
-		// 逐个解析通知方法，并封装为增强器
+		// 获取切面类中没有加@Pointcut的方法，且标注了@Before这些注解的方法，进行遍历生成Advisor
+		// 逐个解析通知方法，并封装为Advisor
 		for (Method method : getAdvisorMethods(aspectClass)) {
 			// Prior to Spring Framework 5.2.7, advisors.size() was supplied as the declarationOrderInAspect
 			// to getAdvisor(...) to represent the "current position" in the declared methods list.
@@ -155,6 +151,7 @@ public class ReflectiveAspectJAdvisorFactory extends AbstractAspectJAdvisorFacto
 			}
 		}
 
+		//一般不会走，可跳过
 		// If it's a per target aspect, emit the dummy instantiating aspect.
 		// @Aspect("pertarget(this(com.zhouyu.service.UserService))")
 		// @Aspect("perthis(this(com.zhouyu.service.UserService))")
@@ -166,6 +163,7 @@ public class ReflectiveAspectJAdvisorFactory extends AbstractAspectJAdvisorFacto
 			advisors.add(0, instantiationAdvisor);
 		}
 
+		////一般不会走，可跳过
 		// Find introduction fields.
 		// 找到哪些字段上加了@DeclareParents注解，把这些字段以及对于的注解解析封装为Advisor，生成代理对象时会把对于的接口添加到ProxyFactory中
 		for (Field field : aspectClass.getDeclaredFields()) {
@@ -219,8 +217,8 @@ public class ReflectiveAspectJAdvisorFactory extends AbstractAspectJAdvisorFacto
 			int declarationOrderInAspect, String aspectName) {
 
 		validate(aspectInstanceFactory.getAspectMetadata().getAspectClass());
-
-		// 拿到当前方法所对应的Pointcut对象，但是注意：如果当前方法上是这么写的@After("pointcut()")，那么此时得到的Pointcut并没有去解析pointcut()得到对应的表达式
+        //方法上是否标注了，ASPECTJ_ANNOTATION_CLASSES这个集合里面定义的注解
+		// 拿到当前方法所对应的Pointcut对象，但是注意：如果当前方法上是这么写的@After("pointcut()")，那么此时得到的Pointcut并没有去解析pointcut()得到对应的表达式，而就是pointcut()
 		AspectJExpressionPointcut expressionPointcut = getPointcut(
 				candidateAdviceMethod, aspectInstanceFactory.getAspectMetadata().getAspectClass());
 		// 没有声明通知注解的方法也会被过滤
@@ -228,8 +226,8 @@ public class ReflectiveAspectJAdvisorFactory extends AbstractAspectJAdvisorFacto
 			return null;
 		}
 
-		// expressionPointcut是pointcut
-		// candidateAdviceMethod承载了advice
+		// expressionPointcut是Pointcut
+		// candidateAdviceMethod就是Advice
 		return new InstantiationModelAwarePointcutAdvisorImpl(expressionPointcut, candidateAdviceMethod,
 				this, aspectInstanceFactory, declarationOrderInAspect, aspectName);
 	}

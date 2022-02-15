@@ -16,9 +16,6 @@
 
 package org.springframework.aop.config;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import org.springframework.aop.aspectj.annotation.AnnotationAwareAspectJAutoProxyCreator;
 import org.springframework.aop.aspectj.autoproxy.AspectJAwareAdvisorAutoProxyCreator;
 import org.springframework.aop.framework.autoproxy.InfrastructureAdvisorAutoProxyCreator;
@@ -29,7 +26,11 @@ import org.springframework.core.Ordered;
 import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
+ * 用于处理 AOP 自动代理创建者注册的实用程序类。
  * Utility class for handling registration of AOP auto-proxy creators.
  *
  * <p>Only a single auto-proxy creator should be registered yet multiple concrete
@@ -58,6 +59,12 @@ public abstract class AopConfigUtils {
 
 	static {
 		// Set up the escalation list...
+		//这哥仨都是SmartInstantiationAwareBeanPostProcessor类型，所以知道什么时候用了吧，没错，直接跳到org.springframework.aop.framework.autoproxy.AbstractAutoProxyCreator.postProcessBeforeInstantiation的这个方法就一目了然了
+		//这里非常重要，注意这三个类的在集合里面的顺序，当程序中，@EnableTransactionManagement和@EnableAspectJAutoProxy同时使用时候
+		//AnnotationAwareAspectJAutoProxyCreator会覆盖掉InfrastructureAdvisorAutoProxyCreator，替换它的功能，虽然覆盖掉了，但是问题不大，这俩的父类是同一个，而且，找切面和找Advisor的逻辑都在父类里面，
+		// 那么在哪里覆盖呢，就是在private static BeanDefinition registerOrEscalateApcAsRequired(
+		//			Class<?> cls, BeanDefinitionRegistry registry, @Nullable Object source)这个方法里面，根据这三个类的在集合里面的顺序来判断相关的优先级
+		//从底下往上进行覆盖，覆盖的逻辑是，替换掉原来BeanDefinition中的beanClass属性
 		APC_PRIORITY_LIST.add(InfrastructureAdvisorAutoProxyCreator.class);
 		APC_PRIORITY_LIST.add(AspectJAwareAdvisorAutoProxyCreator.class);
 		APC_PRIORITY_LIST.add(AnnotationAwareAspectJAutoProxyCreator.class);
@@ -120,12 +127,21 @@ public abstract class AopConfigUtils {
 
 		Assert.notNull(registry, "BeanDefinitionRegistry must not be null");
 
+		//先从容器中获取名称为"org.springframework.aop.config.internalAutoProxyCreator"的BeanDefinition，判断有没有
 		if (registry.containsBeanDefinition(AUTO_PROXY_CREATOR_BEAN_NAME)) {
+			//有的话就把这个BeanDefinition对象取出来,下面来判断是否要进行覆盖
 			BeanDefinition apcDefinition = registry.getBeanDefinition(AUTO_PROXY_CREATOR_BEAN_NAME);
+			//如果入参的Class对象名称如("org.springframework.aop.aspectj.annotation.AnnotationAwareAspectJAutoProxyCreator")和这个BeanDefinition中
+			//的beanClass属性值不一样如("org.springframework.aop.framework.autoproxy.InfrastructureAdvisorAutoProxyCreator")
+			//说明这两个不同的Class
 			if (!cls.getName().equals(apcDefinition.getBeanClassName())) {
+				//找到各自的优先级，即从APC_PRIORITY_LIST这个集合中找到对应的下标值而已
 				int currentPriority = findPriorityForClass(apcDefinition.getBeanClassName());
 				int requiredPriority = findPriorityForClass(cls);
-				if (currentPriority < requiredPriority) {
+				if (currentPriority < requiredPriority) {//说明要替换为优先级更高的，即用AnnotationAwareAspectJAutoProxyCreator覆盖掉InfrastructureAdvisorAutoProxyCreator
+					//给这个BeanDefinition的beanClass属性设置为入参的Class对象名称，注意这里是字符串，如("org.springframework.aop.aspectj.annotation.AnnotationAwareAspectJAutoProxyCreator")
+					//在org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBean(java.lang.String, org.springframework.beans.factory.support.RootBeanDefinition, java.lang.Object[])方法的
+					//Class<?> resolvedClass = this.resolveBeanClass(mbd, beanName, new Class[0]);这行代码，会把上面传入的字符串，解析为对应的Class对象，再赋值给这个BeanDefinition的beanClass属性
 					apcDefinition.setBeanClassName(cls.getName());
 				}
 			}

@@ -70,19 +70,20 @@ public class BeanFactoryAdvisorRetrievalHelper {
 		if (advisorNames == null) {
 			// Do not initialize FactoryBeans here: We need to leave all regular beans
 			// uninitialized to let the auto-proxy creator apply to them!
-			// 不要在这里初始化FactoryBeans：
-			// 我们需要保留所有未初始化的常规bean，以使自动代理创建者对其应用
+			//从容器中获取所有类型为Advisor
+			// 的bean的名称
 			advisorNames = BeanFactoryUtils.beanNamesForTypeIncludingAncestors(
 					this.beanFactory, Advisor.class, true, false);
+			//进行缓存
 			this.cachedAdvisorBeanNames = advisorNames;
 		}
-		if (advisorNames.length == 0) { // 如果当前IOC容器中没有任何增强器类型的bean，直接返回
+		if (advisorNames.length == 0) { // 如果当前IOC容器中没有任何Advisor类型的bean，直接返回
 			return new ArrayList<>();
 		}
         //初始化原生增强器
 		List<Advisor> advisors = new ArrayList<>();
 		for (String name : advisorNames) {
-			if (isEligibleBean(name)) {
+			if (isEligibleBean(name)) {//判断是否是符合要求的bean，默认会调用到org.springframework.aop.framework.autoproxy.AbstractAdvisorAutoProxyCreator.isEligibleAdvisorBean，默认返回的是true
 				if (this.beanFactory.isCurrentlyInCreation(name)) {
 					if (logger.isTraceEnabled()) {
 						logger.trace("Skipping currently created advisor '" + name + "'");
@@ -90,7 +91,7 @@ public class BeanFactoryAdvisorRetrievalHelper {
 				}
 				else {
 					try {
-						advisors.add(this.beanFactory.getBean(name, Advisor.class));
+						advisors.add(this.beanFactory.getBean(name, Advisor.class));//获取Advisor对象并添加到advisors中
 					}
 					catch (BeanCreationException ex) {
 						Throwable rootCause = ex.getMostSpecificCause();
