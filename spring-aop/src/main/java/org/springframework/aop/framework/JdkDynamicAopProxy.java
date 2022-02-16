@@ -16,16 +16,9 @@
 
 package org.springframework.aop.framework;
 
-import java.io.Serializable;
-import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.Method;
-import java.lang.reflect.Proxy;
-import java.util.List;
-
 import org.aopalliance.intercept.MethodInvocation;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
 import org.springframework.aop.AopInvocationException;
 import org.springframework.aop.RawTargetAccess;
 import org.springframework.aop.TargetSource;
@@ -34,6 +27,12 @@ import org.springframework.core.DecoratingProxy;
 import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
+
+import java.io.Serializable;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
+import java.util.List;
 
 /**
  * JDK-based {@link AopProxy} implementation for the Spring AOP framework,
@@ -81,6 +80,7 @@ final class JdkDynamicAopProxy implements AopProxy, InvocationHandler, Serializa
 	private static final Log logger = LogFactory.getLog(JdkDynamicAopProxy.class);
 
 	/** Config used to configure this proxy. */
+	//这个advised其实就是我们创建的那个ProxyFactory对象本身
 	private final AdvisedSupport advised;
 
 	private final Class<?>[] proxiedInterfaces;
@@ -108,8 +108,9 @@ final class JdkDynamicAopProxy implements AopProxy, InvocationHandler, Serializa
 			throw new AopConfigException("No advisors and no TargetSource specified");
 		}
 		this.advised = config;
-		// 设置JDK动态代理所要代理的接口
+		// 设置JDK动态代理所要代理的接口，这里会获取被代理对象实现的接口，以及三个Spring内置接口：SpringProxy、Advised、DecoratingProxy
 		this.proxiedInterfaces = AopProxyUtils.completeProxiedInterfaces(this.advised, true);
+		//判断equals()、hashCode()方法是否要走代理
 		findDefinedEqualsAndHashCodeMethods(this.proxiedInterfaces);
 	}
 
@@ -164,12 +165,12 @@ final class JdkDynamicAopProxy implements AopProxy, InvocationHandler, Serializa
 		Object oldProxy = null;
 		boolean setProxyContext = false;
 
-		// 拿到被代理对象
+		// 拿到被代理对象对应的TargetSource，一般是SingletonTargetSource这个对象
 		TargetSource targetSource = this.advised.targetSource;
 		Object target = null;
 
 		try {
-			// 如果接口中没有定义equals()方法，那么则直接调用，不走代理
+			// 如果接口中没有定义equals()方法，那么则直接调用，不走代理，equalsDefined和hashCodeDefined这两个属性，是在org.springframework.aop.framework.JdkDynamicAopProxy.findDefinedEqualsAndHashCodeMethods方法中设置的
 			if (!this.equalsDefined && AopUtils.isEqualsMethod(method)) {
 				// The target does not implement the equals(Object) method itself.
 				return equals(args[0]);
@@ -202,25 +203,26 @@ final class JdkDynamicAopProxy implements AopProxy, InvocationHandler, Serializa
 
 			// Get as late as possible to minimize the time we "own" the target,
 			// in case it comes from a pool.
-			// 被代理对象和代理类
+			// 拿到真正的被代理对象
 			target = targetSource.getTarget();
+			//获取被代理对象的Class对象
 			Class<?> targetClass = (target != null ? target.getClass() : null);
 
 			// Get the interception chain for this method.
-			// 代理对象在执行某个方法时，根据方法筛选出匹配的Advisor,并适配成Interceptor
+			// 代理对象在执行某个方法时，根据方法筛选出匹配的Advisor,并适配成Interceptor，一般是MethodInterceptor类型的
 			List<Object> chain = this.advised.getInterceptorsAndDynamicInterceptionAdvice(method, targetClass);
 
 			// Check whether we have any advice. If we don't, we can fallback on direct
 			// reflective invocation of the target, and avoid creating a MethodInvocation.
-			if (chain.isEmpty()) {
+			if (chain.isEmpty()) {//如果没有适配的Advisor
 				// We can skip creating a MethodInvocation: just invoke the target directly
 				// Note that the final invoker must be an InvokerInterceptor so we know it does
 				// nothing but a reflective operation on the target, and no hot swapping or fancy proxying.
-				// 如果没有Advice，则直接调用对应方法
+				// 则直接调用对应方法
 				Object[] argsToUse = AopProxyUtils.adaptArgumentsIfNecessary(method, args);
 				retVal = AopUtils.invokeJoinpointUsingReflection(target, method, argsToUse);
 			}
-			else {
+			else {//如果有适配的Advisor，则包装成MethodInvocation，没什么特别的，就是个包装类
 				// We need to create a method invocation...
 				MethodInvocation invocation =
 						new ReflectiveMethodInvocation(proxy, target, method, args, targetClass, chain);

@@ -16,13 +16,6 @@
 
 package org.springframework.aop.framework;
 
-import java.lang.reflect.Array;
-import java.lang.reflect.Method;
-import java.lang.reflect.Proxy;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-
 import org.springframework.aop.SpringProxy;
 import org.springframework.aop.TargetClassAware;
 import org.springframework.aop.TargetSource;
@@ -34,6 +27,13 @@ import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.ReflectionUtils;
+
+import java.lang.reflect.Array;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * Utility methods for AOP proxy factories.
@@ -128,7 +128,7 @@ public abstract class AopProxyUtils {
 		// 被代理对象自己所实现的接口
 		Class<?>[] specifiedInterfaces = advised.getProxiedInterfaces();
 
-		// 如果被代理对象没有实现接口，则判断被代理类是不是接口，或者被代理类是不是已经经过JDK动态代理之后的类从而获取想对应的接口
+		// 如果被代理对象没有实现接口，则判断被代理类是不是接口，或者被代理类是不是已经经过JDK动态代理之后的类从而获取相对应的接口
 		if (specifiedInterfaces.length == 0) {
 			// No user-specified interfaces: check whether target class is an interface.
 			Class<?> targetClass = advised.getTargetClass();

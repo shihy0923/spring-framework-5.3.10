@@ -16,22 +16,12 @@
 
 package org.springframework.aop.aspectj;
 
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.Serializable;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.lang.reflect.Type;
-import java.util.HashMap;
-import java.util.Map;
-
 import org.aopalliance.aop.Advice;
 import org.aopalliance.intercept.MethodInvocation;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.weaver.tools.JoinPointMatch;
 import org.aspectj.weaver.tools.PointcutParameter;
-
 import org.springframework.aop.AopInvocationException;
 import org.springframework.aop.MethodMatcher;
 import org.springframework.aop.Pointcut;
@@ -48,6 +38,15 @@ import org.springframework.util.ClassUtils;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.ReflectionUtils;
 import org.springframework.util.StringUtils;
+
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.Serializable;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Type;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Base class for AOP Alliance {@link org.aopalliance.aop.Advice} classes
@@ -75,38 +74,49 @@ public abstract class AbstractAspectJAdvice implements Advice, AspectJPrecedence
 	 * (in an around advice).
 	 * @return current AspectJ joinpoint, or through an exception if we're not in a
 	 * Spring AOP invocation.
+	 * JoinPoint表示的就是被增强的方法的信息，spring对于它没有什么特别的处理，只是把ReflectiveMethodInvocation包装进去了，而在创建ReflectiveMethodInvocation的时候，所有的信息都有，包括用户的实参
 	 */
 	public static JoinPoint currentJoinPoint() {
+		//这里就不用再多说了  获取当前的MethodInvocation 即ReflectiveMethodInvocation的实例，这个就体现了ExposeInvocationInterceptor的作用了
 		MethodInvocation mi = ExposeInvocationInterceptor.currentInvocation();
 		if (!(mi instanceof ProxyMethodInvocation)) {
 			throw new IllegalStateException("MethodInvocation is not a Spring ProxyMethodInvocation: " + mi);
 		}
 		ProxyMethodInvocation pmi = (ProxyMethodInvocation) mi;
+		//JOIN_POINT_KEY 的值为 JoinPoint.class.getName()
+		//从ReflectiveMethodInvocation中获取JoinPoint 的值
+		//这里在第一次获取的时候 获取到的 JoinPoint是null
+		//然后把下面创建的MethodInvocationProceedingJoinPoint放入到ReflectiveMethodInvocation的userAttributes中
+		//这样在第二次获取的是 就会获取到这个 MethodInvocationProceedingJoinPoint
 		JoinPoint jp = (JoinPoint) pmi.getUserAttribute(JOIN_POINT_KEY);
 		if (jp == null) {
+			//jp里面的signature属性是org.springframework.aop.aspectj.MethodInvocationProceedingJoinPoint.MethodSignatureImpl类型的，貌似没什么卵用。
+			//jp就是对pmi的一层包装，也就没什么特别。如果我们要从JoinPoint里面回去参数的时候(org.springframework.aop.aspectj.MethodInvocationProceedingJoinPoint.getArgs)，
+			//其实就调用的pmi的org.springframework.aop.framework.ReflectiveMethodInvocation.getArguments的方法,获取用户传入的实参
 			jp = new MethodInvocationProceedingJoinPoint(pmi);
 			pmi.setUserAttribute(JOIN_POINT_KEY, jp);
 		}
 		return jp;
 	}
 
-
+    //切面所对应的Class对象
 	private final Class<?> declaringClass;
-
+	//表示这个Advice所代表的方法的方法名
 	private final String methodName;
-
+	//表示这个Advice所代表的方法的参数列表
 	private final Class<?>[] parameterTypes;
-
+    //表示这个Advice所代表的方法
 	protected transient Method aspectJAdviceMethod;
-
+    //表示Advice所代表的切点，里面有切点表达式
 	private final AspectJExpressionPointcut pointcut;
-
+    //一般是LazySingletonAspectInstanceFactoryDecorator，它是在org.springframework.aop.aspectj.annotation.ReflectiveAspectJAdvisorFactory.getAdvisors这个方法里面那个时候生成的
 	private final AspectInstanceFactory aspectInstanceFactory;
 
 	/**
 	 * The name of the aspect (ref bean) in which this advice was defined
 	 * (used when determining advice precedence so that we can determine
 	 * whether two pieces of advice come from the same aspect).
+	 * 切面的名称
 	 */
 	private String aspectName = "";
 
@@ -557,7 +567,7 @@ public abstract class AbstractAspectJAdvice implements Advice, AspectJPrecedence
 		// AMC start
 		Object[] adviceInvocationArgs = new Object[this.parameterTypes.length];
 		int numBound = 0;
-
+        //joinPointArgumentIndex的值在org.springframework.aop.aspectj.annotation.ReflectiveAspectJAdvisorFactory.getAdvice这个方法中的springAdvice.calculateArgumentBindings();这句代码里面设置的
 		if (this.joinPointArgumentIndex != -1) {
 			adviceInvocationArgs[this.joinPointArgumentIndex] = jp;
 			numBound++;
@@ -613,7 +623,7 @@ public abstract class AbstractAspectJAdvice implements Advice, AspectJPrecedence
 	protected Object invokeAdviceMethod(
 			@Nullable JoinPointMatch jpMatch, @Nullable Object returnValue, @Nullable Throwable ex)
 			throws Throwable {
-
+        //jpMatch不知道干嘛用的，但一般为null
 		return invokeAdviceMethodWithGivenArgs(argBinding(getJoinPoint(), jpMatch, returnValue, ex));
 	}
 
@@ -625,7 +635,8 @@ public abstract class AbstractAspectJAdvice implements Advice, AspectJPrecedence
 	}
 
 	protected Object invokeAdviceMethodWithGivenArgs(Object[] args) throws Throwable {
-		Object[] actualArgs = args;
+		Object[] actualArgs = args;//就是实参
+		//判断Advice方法(通知方法)是否有参数
 		if (this.aspectJAdviceMethod.getParameterCount() == 0) {
 			actualArgs = null;
 		}
@@ -633,9 +644,8 @@ public abstract class AbstractAspectJAdvice implements Advice, AspectJPrecedence
 		// 反射调用aspectJAdviceMethod方法
 		try {
 			ReflectionUtils.makeAccessible(this.aspectJAdviceMethod);
-			// 拿到Advice中所记录的LazySingletonAspectInstanceFactoryDecorator对象从而获得切面Bean实例，再执行对应方法
-			// 一个代理对象可能会对应多个Advisor，也就是Advice，而这些Advice在生成时都是用的同一个LazySingletonAspectInstanceFactoryDecorator
-			// 不过一个类如果和某个perthis、pertarget的切面匹配的话，在生成的代理对象中还会有一个额外的Advisor，这个Advisor会负责
+			//this.aspectInstanceFactory.getAspectInstance()获取的就是LazySingletonAspectInstanceFactoryDecorator，然后从里面获取切面Bean实例
+			//利用反射调用Advice方法(通知方法)
 			return this.aspectJAdviceMethod.invoke(this.aspectInstanceFactory.getAspectInstance(), actualArgs);
 		}
 		catch (IllegalArgumentException ex) {
@@ -652,7 +662,7 @@ public abstract class AbstractAspectJAdvice implements Advice, AspectJPrecedence
 	 * Overridden in around advice to return proceeding join point.
 	 */
 	protected JoinPoint getJoinPoint() {
-		return currentJoinPoint();
+		return currentJoinPoint();//看这个
 	}
 
 	/**

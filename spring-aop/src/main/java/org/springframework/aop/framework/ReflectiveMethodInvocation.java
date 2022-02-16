@@ -16,19 +16,18 @@
 
 package org.springframework.aop.framework;
 
+import org.aopalliance.intercept.MethodInterceptor;
+import org.aopalliance.intercept.MethodInvocation;
+import org.springframework.aop.ProxyMethodInvocation;
+import org.springframework.aop.support.AopUtils;
+import org.springframework.core.BridgeMethodResolver;
+import org.springframework.lang.Nullable;
+
 import java.lang.reflect.AccessibleObject;
 import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import org.aopalliance.intercept.MethodInterceptor;
-import org.aopalliance.intercept.MethodInvocation;
-
-import org.springframework.aop.ProxyMethodInvocation;
-import org.springframework.aop.support.AopUtils;
-import org.springframework.core.BridgeMethodResolver;
-import org.springframework.lang.Nullable;
 
 /**
  * Spring's implementation of the AOP Alliance
@@ -60,16 +59,17 @@ import org.springframework.lang.Nullable;
  * @see #getUserAttribute
  */
 public class ReflectiveMethodInvocation implements ProxyMethodInvocation, Cloneable {
-
+    //代理对象本身
 	protected final Object proxy;
 
+	//被代理对象本身
 	@Nullable
 	protected final Object target;
-
+    //当前正在执行的方法
 	protected final Method method;
-
+    //当前正在执行的方法的参数
 	protected Object[] arguments;
-
+    //被代理类
 	@Nullable
 	private final Class<?> targetClass;
 
@@ -82,12 +82,14 @@ public class ReflectiveMethodInvocation implements ProxyMethodInvocation, Clonea
 	/**
 	 * List of MethodInterceptor and InterceptorAndDynamicMethodMatcher
 	 * that need dynamic checks.
+	 * 一般是MethodInterceptor集合
 	 */
 	protected final List<?> interceptorsAndDynamicMethodMatchers;
 
 	/**
 	 * Index from 0 of the current interceptor we're invoking.
 	 * -1 until we invoke: then the current interceptor.
+	 * 当前正在执行的Interceptor的下标值
 	 */
 	private int currentInterceptorIndex = -1;
 
@@ -166,7 +168,7 @@ public class ReflectiveMethodInvocation implements ProxyMethodInvocation, Clonea
 			return invokeJoinpoint();
 		}
 
-		// currentInterceptorIndex初始值为-1
+		// currentInterceptorIndex初始值为-1，从interceptorsAndDynamicMethodMatchers中获取一个MethodInterceptor，一般第一个是ExposeInvocationInterceptor这个Interceptor
 		Object interceptorOrInterceptionAdvice =
 				this.interceptorsAndDynamicMethodMatchers.get(++this.currentInterceptorIndex);
 
@@ -189,7 +191,7 @@ public class ReflectiveMethodInvocation implements ProxyMethodInvocation, Clonea
 				return proceed();
 			}
 		}
-		else {
+		else {//一般走这里
 
 			// It's an interceptor, so we just invoke it: The pointcut will have
 			// been evaluated statically before this object was constructed.

@@ -337,6 +337,7 @@ public class ReflectiveAspectJAdvisorFactory extends AbstractAspectJAdvisorFacto
 		if (argNames != null) {
 			springAdvice.setArgumentNamesFromStringArray(argNames);
 		}
+		//就是在这里判断JointPoint参数的下标值
 		springAdvice.calculateArgumentBindings();
 
 		return springAdvice;

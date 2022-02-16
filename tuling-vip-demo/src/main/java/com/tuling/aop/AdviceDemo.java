@@ -1,8 +1,8 @@
 package com.tuling.aop;
 
+import com.tuling.UserInterface;
 import com.tuling.UserService;
 import com.tuling.aop.advice.ZhouyuAroundAdvice;
-import com.tuling.aop.advice.ZhouyuThrowsAdvice;
 import org.springframework.aop.framework.ProxyFactory;
 import org.springframework.cglib.proxy.Factory;
 
@@ -16,7 +16,9 @@ public class AdviceDemo {
 
 		ProxyFactory proxyFactory = new ProxyFactory(userService);
 		proxyFactory.addAdvice(new ZhouyuAroundAdvice());
-		UserService proxy = (UserService) proxyFactory.getProxy();
+//		proxyFactory.setProxyTargetClass(true);
+		UserInterface proxy = (UserInterface) proxyFactory.getProxy();
+		proxy.test();
 
 		System.out.println(proxy instanceof Factory);
 	}
