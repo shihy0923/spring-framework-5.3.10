@@ -16,21 +16,10 @@
 
 package org.springframework.aop.framework;
 
-import java.io.Serializable;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
-import java.lang.reflect.UndeclaredThrowableException;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.WeakHashMap;
-
 import org.aopalliance.aop.Advice;
 import org.aopalliance.intercept.MethodInvocation;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
 import org.springframework.aop.Advisor;
 import org.springframework.aop.AopInvocationException;
 import org.springframework.aop.PointcutAdvisor;
@@ -56,6 +45,16 @@ import org.springframework.util.ClassUtils;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.ReflectionUtils;
+
+import java.io.Serializable;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.UndeclaredThrowableException;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.WeakHashMap;
 
 /**
  * CGLIB-based {@link AopProxy} implementation for the Spring AOP framework.
@@ -102,6 +101,7 @@ class CglibAopProxy implements AopProxy, Serializable {
 
 
 	/** The configuration used to configure this proxy. */
+	//advised就是ProxyFactory
 	protected final AdvisedSupport advised;
 
 	@Nullable
@@ -163,7 +163,7 @@ class CglibAopProxy implements AopProxy, Serializable {
 		}
 
 		try {
-			// 被代理的类
+			// 被代理的类，根据被代理对象获取的
 			Class<?> rootClass = this.advised.getTargetClass();
 			Assert.state(rootClass != null, "Target class must be available for creating a CGLIB proxy");
 
@@ -175,6 +175,7 @@ class CglibAopProxy implements AopProxy, Serializable {
 				// 获取被代理类所实现的接口
 				Class<?>[] additionalInterfaces = rootClass.getInterfaces();
 				for (Class<?> additionalInterface : additionalInterfaces) {
+					//给ProxyFactory添加接口
 					this.advised.addInterface(additionalInterface);
 				}
 			}
@@ -183,6 +184,7 @@ class CglibAopProxy implements AopProxy, Serializable {
 			validateClassIfNecessary(proxySuperClass, classLoader);
 
 			// Configure CGLIB Enhancer...
+			//创建cglib的增强器
 			Enhancer enhancer = createEnhancer();
 			if (classLoader != null) {
 				enhancer.setClassLoader(classLoader);
@@ -199,7 +201,9 @@ class CglibAopProxy implements AopProxy, Serializable {
 			enhancer.setNamingPolicy(SpringNamingPolicy.INSTANCE);
 			enhancer.setStrategy(new ClassLoaderAwareGeneratorStrategy(classLoader));
 
-			// 获取和被代理类所匹配的Advisor
+			//获取Cglib用所需要的所有的org.springframework.cglib.proxy.MethodInterceptor,(MethodInterceptor实现了Callback接口)
+			//Cglib生成的代理对象就会回调这些MethodInterceptor的intercept方法，所以主要逻辑就是看这些MethodInterceptor的intercept方法
+			//主要看DynamicAdvisedInterceptor
 			Callback[] callbacks = getCallbacks(rootClass);
 			Class<?>[] types = new Class<?>[callbacks.length];
 			for (int x = 0; x < types.length; x++) {
@@ -291,11 +295,16 @@ class CglibAopProxy implements AopProxy, Serializable {
 
 	private Callback[] getCallbacks(Class<?> rootClass) throws Exception {
 		// Parameters used for optimization choices...
+		// 是否需要将代理暴露在threadLocal中
 		boolean exposeProxy = this.advised.isExposeProxy();
+		// 配置是否是冻结的
 		boolean isFrozen = this.advised.isFrozen();
+		// 被代理的目标对象是否是动态的（是否是单例的）
 		boolean isStatic = this.advised.getTargetSource().isStatic();
 
 		// Choose an "aop" interceptor (used for AOP calls).
+		//CglibAopProxy 实现的 AOP 的增强都被封装在了这里
+		//Spring中用cglib代理的执行主要逻辑在这个org.springframework.aop.framework.CglibAopProxy.DynamicAdvisedInterceptor.intercept的方法里面
 		Callback aopInterceptor = new DynamicAdvisedInterceptor(this.advised);
 
 		// Choose a "straight to target" interceptor. (used for calls that are
@@ -355,6 +364,9 @@ class CglibAopProxy implements AopProxy, Serializable {
 		else {
 			callbacks = mainCallbacks;
 		}
+		//这里面最终一般会有7个Callback，Cglib帮我们实现的那个实现类会使用DynamicAdvisedInterceptor这个，还有在equals方法和hashCode方法对应的EqualsInterceptor和HashCodeInterceptor。除了这三个，其他的四个貌似没有用到。
+		//网上说targetInterceptor和targetDispatcher是什么处理没有被AOP切到的方法，感觉纯属在扯淡，翻看了Cglib生产的代理类，并不是这样子。除了equals方法和hashCode方法以外的，所有的方法调用，最终一定会走DynamicAdvisedInterceptor的intercept方法
+		//，不管它是否被AOP切到了。
 		return callbacks;
 	}
 
@@ -665,12 +677,14 @@ class CglibAopProxy implements AopProxy, Serializable {
 	 */
 	private static class DynamicAdvisedInterceptor implements MethodInterceptor, Serializable {
 
+		//就是我们自己的new的那个ProxyFactory对象
 		private final AdvisedSupport advised;
 
 		public DynamicAdvisedInterceptor(AdvisedSupport advised) {
 			this.advised = advised;
 		}
 
+		//这个方法的调用逻辑其实和JDK动态代理的org.springframework.aop.framework.JdkDynamicAopProxy.invoke方法大体是一样的逻辑
 		@Override
 		@Nullable
 		public Object intercept(Object proxy, Method method, Object[] args, MethodProxy methodProxy) throws Throwable {
@@ -687,6 +701,7 @@ class CglibAopProxy implements AopProxy, Serializable {
 				// Get as late as possible to minimize the time we "own" the target, in case it comes from a pool...
 				target = targetSource.getTarget();
 				Class<?> targetClass = (target != null ? target.getClass() : null);
+				// 代理对象在执行某个方法时，根据方法筛选出匹配的Advisor,并适配成Interceptor，一般是MethodInterceptor类型的
 				List<Object> chain = this.advised.getInterceptorsAndDynamicInterceptionAdvice(method, targetClass);
 				Object retVal;
 				// Check whether we only have one InvokerInterceptor: that is,
@@ -701,6 +716,7 @@ class CglibAopProxy implements AopProxy, Serializable {
 				}
 				else {
 					// We need to create a method invocation...
+					//它是ReflectiveMethodInvocation的子类，也没做什么，直接调用了ReflectiveMethodInvocation的proceed()方法。所以实际和JDK动态代理的没什么区别
 					retVal = new CglibMethodInvocation(proxy, target, method, args, targetClass, chain, methodProxy).proceed();
 				}
 				retVal = processReturnType(proxy, target, method, retVal);

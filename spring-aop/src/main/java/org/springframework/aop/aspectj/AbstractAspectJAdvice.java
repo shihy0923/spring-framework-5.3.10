@@ -103,9 +103,9 @@ public abstract class AbstractAspectJAdvice implements Advice, AspectJPrecedence
 	private final Class<?> declaringClass;
 	//表示这个Advice所代表的方法的方法名
 	private final String methodName;
-	//表示这个Advice所代表的方法的参数列表
+	//表示这个Advice所代表的方法(所谓的通知方法)的参数列表
 	private final Class<?>[] parameterTypes;
-    //表示这个Advice所代表的方法
+    //表示这个Advice(所谓的通知方法)所代表的方法
 	protected transient Method aspectJAdviceMethod;
     //表示Advice所代表的切点，里面有切点表达式
 	private final AspectJExpressionPointcut pointcut;
