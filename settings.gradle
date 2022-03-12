@@ -57,10 +57,8 @@ settings.gradle.projectsLoaded {
 		}
 	}
 }
-include 'tuling'
-include 'tuling-web'
-include 'tuling-boot'
-include 'tuling-vip-demo'
+include 'shihy-web'
+include 'shihy-aop'
 include 'spring-tuling-webmvc'
 include 'spring-tuling-boot'
 

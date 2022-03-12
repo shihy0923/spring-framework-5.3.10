@@ -1,4 +1,4 @@
-import com.tuling.javaconfig.controller.TulingTestModelAttributeController;
+import com.shihy.javaconfig.controller.TulingTestModelAttributeController;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
