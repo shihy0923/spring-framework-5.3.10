@@ -13,7 +13,7 @@ public class AdviceDemo {
 
 	public static void main(String[] args) {
 
-		System.setProperty(DebuggingClassWriter.DEBUG_LOCATION_PROPERTY, "E:\\shihy\\CodeOfFrameSource\\spring-framework-5.3.10\\tuling-vip-demo\\build\\classes\\java\\main\\com\\tuling");
+		System.setProperty(DebuggingClassWriter.DEBUG_LOCATION_PROPERTY, "E:\\shihy\\CodeOfFrameSource\\spring-framework-5.3.10\\shihy-aop\\build\\classes\\java\\main");
 		UserService userService = new UserService();
 
 		ProxyFactory proxyFactory = new ProxyFactory(userService);
